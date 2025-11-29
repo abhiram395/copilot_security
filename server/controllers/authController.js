@@ -1,9 +1,18 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
+// Get JWT secret with validation
+const getJwtSecret = () => {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error('JWT_SECRET environment variable is not set');
+  }
+  return secret;
+};
+
 // Generate JWT token
 const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET || 'cybersecurity_secret_key_2024', {
+  return jwt.sign({ id }, getJwtSecret(), {
     expiresIn: '24h'
   });
 };
@@ -13,7 +22,7 @@ const generateToken = (id) => {
 // @access  Public
 const register = async (req, res) => {
   try {
-    const { name, email, password, role } = req.body;
+    const { name, email, password } = req.body;
 
     // Check if user exists
     const userExists = await User.findOne({ email });
@@ -21,12 +30,12 @@ const register = async (req, res) => {
       return res.status(400).json({ message: 'User already exists with this email' });
     }
 
-    // Create user (only allow analyst role for regular registration)
+    // Create user with analyst role - admin role can only be assigned through admin panel
     const user = await User.create({
       name,
       email,
       password,
-      role: role === 'admin' ? 'analyst' : (role || 'analyst') // Prevent admin self-registration
+      role: 'analyst'
     });
 
     if (user) {

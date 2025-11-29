@@ -1,6 +1,7 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { useEffect } from 'react';
 import useAuthStore from './store/authStore';
+import { setOnUnauthorized } from './services/api';
 
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
@@ -31,6 +32,21 @@ const ProtectedRoute = ({ children, adminOnly = false }) => {
   return children;
 };
 
+// Component to set up API unauthorized handler with React Router
+const ApiUnauthorizedHandler = () => {
+  const navigate = useNavigate();
+  const logout = useAuthStore((state) => state.logout);
+  
+  useEffect(() => {
+    setOnUnauthorized(() => {
+      logout();
+      navigate('/login');
+    });
+  }, [navigate, logout]);
+  
+  return null;
+};
+
 function App() {
   const { fetchUser, isAuthenticated, token } = useAuthStore();
   
@@ -42,6 +58,7 @@ function App() {
   
   return (
     <BrowserRouter>
+      <ApiUnauthorizedHandler />
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route 

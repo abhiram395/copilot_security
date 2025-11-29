@@ -7,6 +7,12 @@ const api = axios.create({
   }
 });
 
+// Event for unauthorized access - components can subscribe to handle logout
+let onUnauthorized = null;
+export const setOnUnauthorized = (callback) => {
+  onUnauthorized = callback;
+};
+
 // Add token to requests
 api.interceptors.request.use(
   (config) => {
@@ -25,7 +31,10 @@ api.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       localStorage.removeItem('token');
-      window.location.href = '/login';
+      // Use callback instead of direct window.location manipulation
+      if (onUnauthorized) {
+        onUnauthorized();
+      }
     }
     return Promise.reject(error);
   }

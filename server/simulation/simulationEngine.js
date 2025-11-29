@@ -34,44 +34,45 @@ class SimulationEngine {
     return intervals[this.intensity] || 1000;
   }
 
+  // Private method to generate and emit a single log
+  async _generateAndEmitLog() {
+    if (!this.isRunning) return;
+    
+    const log = generateAttackLog(this.enabledAttackTypes);
+    
+    try {
+      // Save to database
+      const savedLog = await AttackLog.create(log);
+      
+      // Update stats
+      this.updateStats(savedLog);
+      
+      // Add to recent logs (keep last 50)
+      this.recentLogs.unshift(savedLog);
+      if (this.recentLogs.length > 50) this.recentLogs.pop();
+      
+      // Emit to all connected clients
+      if (this.io) {
+        this.io.emit('log:new', savedLog);
+        this.io.emit('simulation:stats', this.getStats());
+      }
+    } catch (error) {
+      console.error('Error generating log:', error);
+    }
+  }
+
   // Start simulation
   async start() {
     if (this.isRunning) return { success: false, message: 'Simulation already running' };
     
     this.isRunning = true;
     this.emitStatus();
-    
-    const generateAndEmit = async () => {
-      if (!this.isRunning) return;
-      
-      const log = generateAttackLog(this.enabledAttackTypes);
-      
-      try {
-        // Save to database
-        const savedLog = await AttackLog.create(log);
-        
-        // Update stats
-        this.updateStats(savedLog);
-        
-        // Add to recent logs (keep last 50)
-        this.recentLogs.unshift(savedLog);
-        if (this.recentLogs.length > 50) this.recentLogs.pop();
-        
-        // Emit to all connected clients
-        if (this.io) {
-          this.io.emit('log:new', savedLog);
-          this.io.emit('simulation:stats', this.getStats());
-        }
-      } catch (error) {
-        console.error('Error generating log:', error);
-      }
-    };
 
     // Start generating logs
-    this.interval = setInterval(generateAndEmit, this.getInterval());
+    this.interval = setInterval(() => this._generateAndEmitLog(), this.getInterval());
     
     // Generate first log immediately
-    await generateAndEmit();
+    await this._generateAndEmitLog();
     
     return { success: true, message: 'Simulation started' };
   }
@@ -138,22 +139,7 @@ class SimulationEngine {
       // Restart with new interval if running
       if (this.isRunning && this.interval) {
         clearInterval(this.interval);
-        this.interval = setInterval(async () => {
-          if (!this.isRunning) return;
-          const log = generateAttackLog(this.enabledAttackTypes);
-          try {
-            const savedLog = await AttackLog.create(log);
-            this.updateStats(savedLog);
-            this.recentLogs.unshift(savedLog);
-            if (this.recentLogs.length > 50) this.recentLogs.pop();
-            if (this.io) {
-              this.io.emit('log:new', savedLog);
-              this.io.emit('simulation:stats', this.getStats());
-            }
-          } catch (error) {
-            console.error('Error generating log:', error);
-          }
-        }, this.getInterval());
+        this.interval = setInterval(() => this._generateAndEmitLog(), this.getInterval());
       }
     }
     
